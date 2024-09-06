@@ -1,11 +1,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameController : MonoBehaviour
 {
+    [SerializeField] private Text scoreText;
+    [SerializeField] private Text comboText;
+    [SerializeField] private Text gameFinishedInfotText;
     [SerializeField] private Sprite bgImage;
+    [SerializeField] AudioClip succesClip;
+    [SerializeField] AudioClip wrongClip;
+    [SerializeField] private Button restartButton;
     public Sprite[] puzzles;
     public List<Sprite> gamePuzzles = new List<Sprite>();
     public List<Button> btns = new List<Button>();
@@ -16,12 +23,20 @@ public class GameController : MonoBehaviour
     private int gameGuesses;
     private int firstGuessIndex;
     private int secondGuessIndex;
+    private int score;
+    private int comboCount;
+    private int maxComboBonus = 20;
+    private int baseScorePerMatch = 10;
+    private int comboBonus = 10;
     private string firstGuessPuzzle;
     private string secondGuessPuzzle;
+    private bool lastMatchWasCorrect;
+    private AudioSource AS;
 
     private void Awake()
     {
         puzzles = Resources.LoadAll<Sprite>("Sprites/Fruits");
+        AS = GetComponent<AudioSource>();
     }
 
     private void Start()
@@ -31,6 +46,22 @@ public class GameController : MonoBehaviour
         AddGamePuzzles();
         Shuffle(gamePuzzles);
         gameGuesses = gamePuzzles.Count / 2;
+        score = 0;
+        comboCount = 0;
+        lastMatchWasCorrect = false;
+        UpdateScoreText();
+
+        if(restartButton != null)
+        {
+            restartButton.gameObject.SetActive(false);
+
+            restartButton.onClick.RemoveAllListeners();
+            restartButton.onClick.AddListener(() =>
+            {
+                RestartGame();
+                restartButton.gameObject.SetActive(false);
+            });
+        }
     }
 
     private void GetButtons()
@@ -96,7 +127,7 @@ public class GameController : MonoBehaviour
     {
         yield return new WaitForSeconds(0.2f);
 
-        if(firstGuessPuzzle == secondGuessPuzzle)
+        if(firstGuessPuzzle == secondGuessPuzzle && firstGuessIndex != secondGuessIndex)
         {
             yield return new WaitForSeconds(0.2f);
             btns[firstGuessIndex].interactable = false;
@@ -105,6 +136,23 @@ public class GameController : MonoBehaviour
             //btns[firstGuessIndex].image.color = new Color(0, 0, 0, 0);
             //btns[secondGuessIndex].image.color = new Color(0, 0, 0, 0);
 
+            if (lastMatchWasCorrect)
+            {
+                score += baseScorePerMatch + comboBonus;
+                comboCount++;
+                comboText.text = "You made Combo +" + comboBonus;
+            }
+            else
+            {
+                score += baseScorePerMatch;
+                comboCount = 1;
+                comboText.text = string.Empty;
+            }
+
+            lastMatchWasCorrect = true;
+            AS.PlayOneShot(succesClip, 1);
+            UpdateScoreText();
+
             CheckIfGameIsFinished();
         }
         else
@@ -112,6 +160,10 @@ public class GameController : MonoBehaviour
             yield return new WaitForSeconds(0.2f);
             btns[firstGuessIndex].image.sprite = bgImage;
             btns[secondGuessIndex].image.sprite = bgImage;
+            lastMatchWasCorrect = false;
+            comboCount = 0;
+            comboText.text = string.Empty;
+            AS.PlayOneShot(wrongClip, 1);
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -124,8 +176,12 @@ public class GameController : MonoBehaviour
 
         if(countCorrectGuesses == gameGuesses)
         {
-            Debug.Log("Game Finished");
-            Debug.Log("It took ypu " + countGuesses + " many guess(es) to finish the game");
+            gameFinishedInfotText.text = $"GAME FINISHED \n It took you {countGuesses} many guess(es) to finish game \n Yout Final Score is: {score}";
+
+            if (restartButton != null)
+            {
+                restartButton.gameObject.SetActive(true);
+            }
         }
     }
 
@@ -138,5 +194,18 @@ public class GameController : MonoBehaviour
             list[i] = list[randomIndex];
             list[randomIndex] = tmp;
         }
+    }
+
+    private void UpdateScoreText()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = "Score: " + score;
+        }
+    }
+
+    private void RestartGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
